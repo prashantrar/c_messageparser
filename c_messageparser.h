@@ -7,7 +7,7 @@ typedef struct {
 
 typedef struct {
     message_t* msg;
-    uint8_t destination_id;
+    int destination_id;
 } message_q;
 
 void init_messageparser();
@@ -16,6 +16,6 @@ message_t* new_message();
 
 void delete_message(message_t* msg);
 
-int send(uint8_t destination_id, message_t* msg);
+int send(int destination_id, message_t* msg);
 
-int recv(uint8_t receiver_id, message_t** msg);
+int recv(int receiver_id, message_t** msg);

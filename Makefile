@@ -11,7 +11,7 @@ messageparser: c_messageparser.c c_messageparser.h c_messageparser_defines.h c_m
 	$(CC) -g -shared -o libc_messageparser.so c_messageparser.o
 
 tests: messageparser  libc_messageparser.so
-	$(CC) -g -L./ -Wl,-rpath=./ -Wall -o tests c_messageparser_tests.c -lc_messageparser
+	$(CC) -g -L./ -Wl,-rpath=./ -Wall -o tests c_messageparser_tests.c -lc_messageparser -lpthread -lrt
 
 clean:
 	rm -rf ./~* *.o *.so tests
