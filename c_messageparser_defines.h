@@ -5,8 +5,9 @@
 #include <string.h>
 #include <stdint.h>
 
-#define C_MSGPARSER_MSG_Q_SIZE 255
-#define C_MSGPARSER_MSQ_Q_EMPTY 0
+/* User defined max message heap size */
+#define C_MSGPARSER_MSG_HEAP_SIZE 255
+#define C_MSGPARSER_MSQ_HEAP_EMPTY 0
 
 #define C_MSGPARSER_INVALID_MSG NULL
 #define C_MSGPARSER_INVALID_MSG_LEN 0Xffff
