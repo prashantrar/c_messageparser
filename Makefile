@@ -7,7 +7,7 @@ MKDIR_P = mkdir -p
 all: messageparser tests
 
 messageparser: c_messageparser.c c_messageparser.h c_messageparser_defines.h c_messageparser.o
-	$(CC) -g -c -Wall -Werror -fpic c_messageparser.c
+	$(CC) -g -c -Wall -Werror -fpic c_messageparser.c -lpthread -lrt
 	$(CC) -g -shared -o libc_messageparser.so c_messageparser.o
 
 tests: messageparser  libc_messageparser.so

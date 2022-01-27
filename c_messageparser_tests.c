@@ -4,13 +4,15 @@
 void* recvfn(void* args) {
     sem_wait(&test_start);
     message_t* recv_msg = C_MSGPARSER_INVALID_MSG;
-    ASSERT_EQ(C_MSGPARSER_SUCCESS, recv(pthread_self(),&recv_msg));
+    recv(pthread_self(),&recv_msg);
     if(recv_msg!=C_MSGPARSER_INVALID_MSG) {
         if(recv_msg->data[0]==254) {
-            free(recv_msg);
+            delete_message(recv_msg);
+            sem_post(&test_start);
             return (void*)C_MSG_PARSER_TEST_SUCCESS;
         }
     }
+    sem_post(&test_start);
     return (void*)C_MSG_PARSER_TEST_FAIL;
 }
 
@@ -23,11 +25,73 @@ void* sendfn(void* args) {
     } else {
         return (void*)C_MSG_PARSER_TEST_FAIL;
     }
-    sem_post(&test_start);
     return (void*)C_MSG_PARSER_TEST_SUCCESS;
 }
 
+int testRepeatTxRx() {
+    sem_wait(&test_start);
+    pthread_t send_t[5];
+    pthread_t recv_t[5];
+    uint8_t itr = 0;
+    //Create receive threads
+    for(itr=0;itr<5;++itr) {
+        pthread_create(&recv_t[itr],NULL,recvfn,NULL);
+    }
+    
+    //Create and join send threads
+    for(itr=0;itr<5;++itr) {
+        thread_args* send_args = (thread_args*)malloc(sizeof(thread_args));
+        send_args->destination_id = recv_t[itr];
+        pthread_create(&send_t[itr],NULL,sendfn,send_args);
+        int send_status;
+        pthread_join(send_t[itr],(void**)&send_status);
+        if(send_status != C_MSG_PARSER_TEST_SUCCESS) {
+            return C_MSG_PARSER_TEST_FAIL;
+        }
+    }
+    //Post semaphore to trigger receive.
+    sem_post(&test_start);
+    //Wait for and join all receive threads
+    for(itr=0;itr<5;++itr) {
+        int recv_status;
+        pthread_join(recv_t[itr],(void**)&recv_status);
+        if(recv_status != C_MSG_PARSER_TEST_SUCCESS) {
+            return C_MSG_PARSER_TEST_FAIL;
+        }
+    }
+    return C_MSG_PARSER_TEST_SUCCESS;
+}
+
+int testRecvNone() {
+    pthread_t recv_t;
+    pthread_create(&recv_t,NULL,recvfn,NULL);
+    int recv_status;
+    pthread_join(recv_t,(void**)&recv_status);
+    if(recv_status != C_MSG_PARSER_TEST_SUCCESS) {
+        return C_MSG_PARSER_TEST_FAIL;
+    }
+    return C_MSG_PARSER_TEST_SUCCESS;
+}
+
+int testSendMaxLimit() {
+    pthread_t send_t;
+    thread_args* send_args = (thread_args*)malloc(sizeof(thread_args));
+    send_args->destination_id = -1;
+    uint8_t itr = 0;
+    for(itr=0;itr<=C_MSGPARSER_MSG_Q_SIZE+1;++itr) {
+        pthread_create(&send_t,NULL,sendfn,send_args);
+        int send_status;
+        pthread_join(send_t,(void**)&send_status);
+        if(send_status != C_MSG_PARSER_TEST_SUCCESS) {
+            clear_messageparser();
+            return C_MSG_PARSER_TEST_FAIL;
+        }
+    }
+    return C_MSG_PARSER_TEST_SUCCESS;
+}
+
 int testMultipleThreadTxRx() {
+    sem_wait(&test_start);
     pthread_t send_t;
     pthread_t recv_t;
     pthread_create(&recv_t,NULL,recvfn,NULL);
@@ -40,6 +104,7 @@ int testMultipleThreadTxRx() {
     if(send_status != C_MSG_PARSER_TEST_SUCCESS) {
         return C_MSG_PARSER_TEST_FAIL;
     }
+    sem_post(&test_start);
     int recv_status;
     pthread_join(recv_t,(void**)&recv_status);
     if(recv_status != C_MSG_PARSER_TEST_SUCCESS) {
@@ -49,6 +114,7 @@ int testMultipleThreadTxRx() {
 }
 
 int testSingleThreadTxRx() {
+    sem_wait(&test_start);
     message_t* send_msg = new_message();
     if(send_msg!=C_MSGPARSER_INVALID_MSG) {
         send_msg->data[0] = 254;
@@ -56,11 +122,12 @@ int testSingleThreadTxRx() {
     } else {
         return C_MSG_PARSER_TEST_FAIL;
     }
+    sem_post(&test_start);
     message_t* recv_msg = C_MSGPARSER_INVALID_MSG;
     ASSERT_EQ(C_MSGPARSER_SUCCESS, recv(pthread_self(),&recv_msg));
     if(recv_msg!=C_MSGPARSER_INVALID_MSG) {
         if(recv_msg->data[0]==254) {
-            free(recv_msg);
+            delete_message(recv_msg);
             return C_MSG_PARSER_TEST_SUCCESS;
         }
     }
@@ -70,8 +137,13 @@ int testSingleThreadTxRx() {
 
 void test_main() {
     init_messageparser();
+    sem_init(&test_start, 0, 1);
     TEST_EQ(C_MSG_PARSER_TEST_SUCCESS,testSingleThreadTxRx());
     TEST_EQ(C_MSG_PARSER_TEST_SUCCESS,testMultipleThreadTxRx());
+    TEST_EQ(C_MSG_PARSER_TEST_FAIL,testSendMaxLimit());
+    TEST_EQ(C_MSG_PARSER_TEST_FAIL,testRecvNone());
+    TEST_EQ(C_MSG_PARSER_TEST_SUCCESS,testRepeatTxRx());
+    sem_destroy(&test_start);
 }
 
 int main() {
